@@ -71,6 +71,9 @@ RUN <<EOF
     mv /usr/local/gcc-arm-none-eabi-${GCC_ARM_VERSION}/ /usr/local/gcc-arm-none-eabi
     rm -rf /usr/local/gcc-arm-none-eabi/share
 
+    # Install Azure CLI
+    curl -sL https://aka.ms/InstallAzureCLIDeb | bash
+
     # Apt cleanup
     apt-get clean
     apt-get purge
