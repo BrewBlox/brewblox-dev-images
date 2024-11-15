@@ -130,6 +130,9 @@ RUN <<EOF
         git submodule update --init --recursive --depth 1 --single-branch
     fi
 
+    # install latest version of clangd. In vscode, set executable to clangd-18
+    bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+
     update-ca-certificates --fresh
     $IDF_PATH/tools/idf_tools.py --non-interactive install required
     $IDF_PATH/tools/idf_tools.py --non-interactive install cmake
@@ -173,7 +176,8 @@ RUN <<EOF
     curl -sL https://aka.ms/InstallAzureCLIDeb | bash
 
     # Apt cleanup
-    apt-get clean
+    apt-get autoremove -y
+    apt-get clean -y
     apt-get purge
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 EOF
@@ -190,5 +194,4 @@ RUN <<EOF
     # Export again to add clang-format to path
     # Create a system-wide link so it can be used outside the IDF context
     . /opt/esp/idf/export.sh
-    sudo ln -s "$(which clang-format)" /usr/local/bin/clang-format
 EOF
