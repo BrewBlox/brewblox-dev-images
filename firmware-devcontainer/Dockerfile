@@ -10,7 +10,7 @@ ENV IDF_CLONE_URL=https://github.com/espressif/esp-idf.git \
     IDF_TOOLS_PATH=/opt/esp \
     IDF_CCACHE_ENABLE=1 \
     BOOST_ROOT=/usr/include/boost \
-    CMAKE_VERSION=3.23.2 \
+    CMAKE_VERSION=3.31.0 \
     SHFMT_VERSION=v3.4.2 \
     NODE_MAJOR=20 \
     GCC_ARM_URL="https://developer.arm.com/-/media/Files/downloads/gnu-rm/10.3-2021.07/gcc-arm-none-eabi-10.3-2021.07-x86_64-linux.tar.bz2" \
@@ -37,7 +37,7 @@ RUN <<EOF
         | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
     echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main" \
         > /etc/apt/sources.list.d/nodesource.list
-
+     
     apt-get update -q
     apt-get install -y --no-install-recommends \
         autoconf \
@@ -48,12 +48,10 @@ RUN <<EOF
         build-essential \
         bzip2 \
         ccache \
+        catch2 \
         check \
         dfu-util \
         flex \
-        g++-12 \
-        gcc-12 \
-        gcovr \
         gdb \
         git \
         gperf \

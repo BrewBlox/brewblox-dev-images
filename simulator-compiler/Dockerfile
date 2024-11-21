@@ -5,7 +5,7 @@ ENV TZ=Europe/Amsterdam \
     DEBIAN_FRONTEND=noninteractive \
     DEBCONF_NONINTERACTIVE_SEEN=true \
     BOOST_ROOT=/usr/include/boost \
-    CMAKE_VERSION=3.23.2
+    CMAKE_VERSION=3.31.0
 
 RUN <<EOF
     set -ex
@@ -17,13 +17,16 @@ RUN <<EOF
     apt-get install -y --no-install-recommends \
         curl \
         wget \
-        software-properties-common
+        software-properties-common \
+        lsb-release \
+        gnupg
     apt-get install -y --no-install-recommends \
         autoconf \
         automake \
         bash \
         bear \
         build-essential \
+        catch2 \
         ccache \
         gcc-12 \
         git \
@@ -34,6 +37,7 @@ RUN <<EOF
         libprotobuf-dev \
         libssl-dev \
         libtool \
+        ninja-build \
         pkg-config \
         protobuf-compiler \
         python3 \
@@ -75,7 +79,11 @@ RUN <<EOF
         https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-x86_64.sh
     sh /tmp/cmake-installer.sh --skip-license --prefix=/usr/local/
 
+    # install latest version of clangd. In vscode, set executable to clangd-18
+    bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+
     # Apt cleanup
+    apt-get autoremove
     apt-get clean
     apt-get purge
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*

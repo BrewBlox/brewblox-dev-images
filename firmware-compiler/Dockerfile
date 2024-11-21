@@ -75,6 +75,7 @@ RUN <<EOF
     curl -sL https://aka.ms/InstallAzureCLIDeb | bash
 
     # Apt cleanup
+    apt-get autoremove
     apt-get clean
     apt-get purge
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
