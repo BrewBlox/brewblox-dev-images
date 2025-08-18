@@ -4,7 +4,9 @@ LABEL org.opencontainers.image.source="https://github.com/BrewBlox/brewblox-dev-
 ARG USERNAME=vscode
 
 ENV IDF_CLONE_URL=https://github.com/espressif/esp-idf.git \
-    IDF_CLONE_BRANCH_OR_TAG=v5.1.1 \
+    # Bumped from v5.1.1 -> v5.5 (2025 upgrade). If pinning a specific commit, set IDF_CHECKOUT_REF.
+    IDF_CLONE_BRANCH_OR_TAG=v5.5 \
+    IDF_VERSION=v5.5 \
     IDF_CHECKOUT_REF= \
     IDF_PATH=/opt/esp/idf \
     IDF_TOOLS_PATH=/opt/esp \
@@ -93,11 +95,13 @@ RUN <<EOF
         diff-so-fancy
 
     python3 -m pip install --upgrade --break-system-packages \
+        pip \
+        wheel
+    python3 -m pip install --upgrade --break-system-packages \
         autopep8 \
         flake8 \
         invoke \
         nanopb==0.4.7 \
-        pip \
         pyserial \
         pyusb \
         virtualenv
@@ -178,18 +182,27 @@ RUN <<EOF
     apt-get clean -y
     apt-get purge
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+    # Remove esp-idf activation temp dir if created during build (will be recreated per-user)
+    rm -rf /tmp/esp_idf_activate_vscode || true
 EOF
 
 # Install IDF dependencies in a separate RUN
-# This prevents polluting the environment with idf/export.sh variables
-RUN <<EOF
-    set -ex
+# Use bash to allow export.sh to detect its path (needs BASH_SOURCE) and force IDF_PATH usage
+SHELL ["/bin/bash","-c"]
+RUN <<'EOF'
+set -euo pipefail
+export IDF_PATH_FORCE=1
+source /opt/esp/idf/export.sh
+pip3 install --upgrade pyclang
+idf_tools.py install esp-clang
 
-    . /opt/esp/idf/export.sh
-    pip3 install --upgrade pyclang
-    idf_tools.py install esp-clang
+# Export again to add clang-format to path
+source /opt/esp/idf/export.sh
 
-    # Export again to add clang-format to path
-    # Create a system-wide link so it can be used outside the IDF context
-    . /opt/esp/idf/export.sh
+# Ensure activation temp dir does not persist root ownership
+rm -rf /tmp/esp_idf_activate_vscode || true
 EOF
+
+# Default to non-root user for devcontainer runtime
+USER vscode
