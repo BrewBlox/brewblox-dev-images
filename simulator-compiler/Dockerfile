@@ -93,4 +93,4 @@ RUN <<EOF
 EOF
 
 WORKDIR /firmware
-CMD bash
+CMD ["bash"]
