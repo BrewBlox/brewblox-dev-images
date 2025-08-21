@@ -132,7 +132,7 @@ RUN <<EOF
         git submodule update --init --recursive --depth 1 --single-branch
     fi
 
-    # install latest version of clangd. In vscode, set executable to clangd-18
+    # install latest version of clangd. In vscode, set executable to clangd-20
     bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
 
     update-ca-certificates --fresh

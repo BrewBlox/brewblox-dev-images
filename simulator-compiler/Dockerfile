@@ -79,7 +79,7 @@ RUN <<EOF
         https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-x86_64.sh
     sh /tmp/cmake-installer.sh --skip-license --prefix=/usr/local/
 
-    # install latest version of clangd. In vscode, set executable to clangd-18
+    # install latest version of clangd
     bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
 
     # Apt cleanup
