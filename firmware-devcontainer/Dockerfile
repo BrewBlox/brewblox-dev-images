@@ -39,7 +39,7 @@ RUN <<EOF
         | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
     echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main" \
         > /etc/apt/sources.list.d/nodesource.list
-     
+
     apt-get update -q
     apt-get install -y --no-install-recommends \
         autoconf \
@@ -94,10 +94,10 @@ RUN <<EOF
         lv_font_conv \
         diff-so-fancy
 
-    python3 -m pip install --upgrade --break-system-packages \
+    python3 -m pip install --upgrade --break-system-packages --no-cache-dir \
         pip \
         wheel
-    python3 -m pip install --upgrade --break-system-packages \
+    python3 -m pip install --upgrade --break-system-packages --no-cache-dir \
         autopep8 \
         flake8 \
         invoke \
@@ -132,8 +132,44 @@ RUN <<EOF
         git submodule update --init --recursive --depth 1 --single-branch
     fi
 
-    # install latest version of clangd. In vscode, set executable to clangd-20
-    bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+    # install latest LLVM toolchain via apt.llvm.org installer.
+    # LLVM / clang installer - edit LLVM_VERSION (ENV) above to change the installed toolchain
+    # Run the apt.llvm.org installer with the requested LLVM_VERSION and 'all' to install
+    # additional tools (clang-format, clang-tidy, clang-tools, etc.).
+    wget -qO /tmp/llvm.sh https://apt.llvm.org/llvm.sh
+    bash /tmp/llvm.sh ${LLVM_VERSION} all
+
+    # Register any installed versioned LLVM binaries as versionless alternatives.
+    # Detect an installed clang-* binary to infer the LLVM version, then register
+    # all /usr/bin/*-<version> executables with update-alternatives so 'clang',
+    # 'clang-format', 'clang-tidy', 'clangd', etc. work without the version suffix.
+    LLVM_VER=""
+    for v in /usr/bin/clang-[0-9]*; do
+        [ -e "$v" ] || continue
+        if [ -x "$v" ]; then
+            LLVM_VER="${v##*-}"
+            break
+        fi
+    done
+
+    if [ -n "$LLVM_VER" ]; then
+        echo "Registering LLVM tools for version: $LLVM_VER"
+        for vp in /usr/bin/*-"$LLVM_VER"; do
+            [ -e "$vp" ] || continue
+            [ -x "$vp" ] || continue
+            binname="$(basename "$vp")"
+            # strip the -<version> suffix
+            base="${binname%-${LLVM_VER}}"
+            # ensure base is not empty
+            if [ -n "$base" ]; then
+                echo " -> $base -> $vp"
+                update-alternatives --install "/usr/bin/${base}" "${base}" "$vp" 200 || true
+                update-alternatives --set "${base}" "$vp" || true
+            fi
+        done
+    else
+        echo "No versioned clang binary found; skipping LLVM alternatives registration"
+    fi
 
     update-ca-certificates --fresh
     $IDF_PATH/tools/idf_tools.py --non-interactive install required
@@ -177,11 +213,11 @@ RUN <<EOF
     # Install Azure CLI
     curl -sL https://aka.ms/InstallAzureCLIDeb | bash
 
-    # Apt cleanup
+    # Apt cleanup + remove pip caches to reduce image size
     apt-get autoremove -y
     apt-get clean -y
     apt-get purge
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /root/.cache/pip /home/$USERNAME/.cache/pip || true
 
     # Remove esp-idf activation temp dir if created during build (will be recreated per-user)
     rm -rf /tmp/esp_idf_activate_vscode || true
@@ -197,12 +233,11 @@ source /opt/esp/idf/export.sh
 pip3 install --upgrade pyclang
 idf_tools.py install esp-clang
 
-# Export again to add clang-format to path
-source /opt/esp/idf/export.sh
-
 # Ensure activation temp dir does not persist root ownership
 rm -rf /tmp/esp_idf_activate_vscode || true
+# Remove pip caches left by pyclang/idf_tools.py
+rm -rf /root/.cache/pip /home/$USERNAME/.cache/pip || true
 EOF
 
-# Default to non-root user for devcontainer runtime
-USER vscode
+# Default to non-root user for devcontainer runtime (use USERNAME at the top of the file)
+USER ${USERNAME}
