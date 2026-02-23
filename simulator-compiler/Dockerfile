@@ -30,6 +30,8 @@ RUN <<EOF
         ccache \
         gcc-12 \
         git \
+        libboost-context1.74-dev \
+        libboost-fiber1.74-dev \
         libboost-program-options1.74-dev \
         libboost-random1.74-dev \
         libboost-system1.74-dev \
@@ -50,6 +52,8 @@ RUN <<EOF
     apt-get install -y \
         gcc-12-arm-linux-gnueabihf \
         g++-12-arm-linux-gnueabihf \
+        libboost-context1.74-dev:armhf \
+        libboost-fiber1.74-dev:armhf \
         libboost-program-options1.74-dev:armhf \
         libboost-random1.74-dev:armhf \
         libboost-system1.74-dev:armhf \
@@ -60,6 +64,8 @@ RUN <<EOF
     apt-get install -y \
         gcc-12-aarch64-linux-gnu \
         g++-12-aarch64-linux-gnu \
+        libboost-context1.74-dev:arm64 \
+        libboost-fiber1.74-dev:arm64 \
         libboost-program-options1.74-dev:arm64 \
         libboost-random1.74-dev:arm64 \
         libboost-system1.74-dev:arm64 \
