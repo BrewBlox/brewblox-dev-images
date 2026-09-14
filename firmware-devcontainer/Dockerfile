@@ -13,6 +13,9 @@ ENV IDF_CLONE_URL=https://github.com/espressif/esp-idf.git \
     IDF_CCACHE_ENABLE=1 \
     BOOST_ROOT=/usr/include/boost \
     CMAKE_VERSION=3.31.0 \
+    # The firmware test and simulator builds pin clang-20; an unpinned llvm.sh installs
+    # whatever apt.llvm.org currently calls stable.
+    LLVM_VERSION=20 \
     SHFMT_VERSION=v3.4.2 \
     NODE_MAJOR=20 \
     GCC_ARM_URL="https://developer.arm.com/-/media/Files/downloads/gnu-rm/10.3-2021.07/gcc-arm-none-eabi-10.3-2021.07-x86_64-linux.tar.bz2" \
@@ -24,6 +27,17 @@ RUN <<EOF
 
     export DEBIAN_FRONTEND=noninteractive
     dpkg --add-architecture i386
+
+    # Keep package docs, man pages and non-English locales out of the image (about 360 MB
+    # otherwise). Copyright files are kept.
+    cat > /etc/dpkg/dpkg.cfg.d/01_nodoc <<'DPKG'
+path-exclude /usr/share/doc/*
+path-include /usr/share/doc/*/copyright
+path-exclude /usr/share/man/*
+path-exclude /usr/share/info/*
+path-exclude /usr/share/locale/*
+path-include /usr/share/locale/en*
+DPKG
 
     apt-get update -q
     apt-get install -y --no-install-recommends \
@@ -57,6 +71,8 @@ RUN <<EOF
         gdb \
         git \
         gperf \
+        heaptrack \
+        inotify-tools \
         isomd5sum \
         jq \
         lcov \
@@ -68,6 +84,7 @@ RUN <<EOF
         libprotobuf-dev \
         libtool \
         libusb-1.0-0-dev \
+        linux-perf \
         make \
         ninja-build \
         nodejs \
@@ -97,8 +114,11 @@ RUN <<EOF
     python3 -m pip install --upgrade --break-system-packages --no-cache-dir \
         pip \
         wheel
+    # clangd-tidy drives the installed clangd over LSP; the firmware repo's lint gate
+    # (invoke lint.changed) and its pre-commit hook call clangd-tidy-diff.
     python3 -m pip install --upgrade --break-system-packages --no-cache-dir \
         autopep8 \
+        clangd-tidy==1.1.1 \
         flake8 \
         invoke \
         nanopb==0.4.7 \
@@ -172,7 +192,8 @@ RUN <<EOF
     fi
 
     update-ca-certificates --fresh
-    $IDF_PATH/tools/idf_tools.py --non-interactive install required
+    # Only the chips this repo builds for; the default installs every target's toolchain.
+    $IDF_PATH/tools/idf_tools.py --non-interactive install --targets esp32,esp32s3 required
     $IDF_PATH/tools/idf_tools.py --non-interactive install cmake
     $IDF_PATH/tools/idf_tools.py --non-interactive install-python-env
     rm -rf $IDF_TOOLS_PATH/dist
@@ -210,8 +231,8 @@ RUN <<EOF
         /home/$USERNAME/.vscode-server \
         /home/$USERNAME/.vscode-server-insiders
 
-    # Install Azure CLI
-    curl -sL https://aka.ms/InstallAzureCLIDeb | bash
+    # Azure CLI (627 MB) is not installed: only `invoke deploy.release` uses it and CI runs
+    # that on GitHub's runner. Install on demand with `curl -sL https://aka.ms/InstallAzureCLIDeb | bash`.
 
     # Apt cleanup + remove pip caches to reduce image size
     apt-get autoremove -y
@@ -219,25 +240,18 @@ RUN <<EOF
     apt-get purge
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /root/.cache/pip /home/$USERNAME/.cache/pip || true
 
+    # Drop documentation and non-English locales already installed (the dpkg config written
+    # above keeps later installs from bringing them back). Copyright files stay.
+    find /usr/share/doc -mindepth 1 -maxdepth 1 -type d -exec sh -c 'find "$1" -type f ! -name copyright -delete' _ {} \;
+    rm -rf /usr/share/man/* /usr/share/info/*
+    find /usr/share/locale -mindepth 1 -maxdepth 1 -type d ! -name 'en' ! -name 'en_*' -exec rm -rf {} +
+
     # Remove esp-idf activation temp dir if created during build (will be recreated per-user)
     rm -rf /tmp/esp_idf_activate_vscode || true
 EOF
 
-# Install IDF dependencies in a separate RUN
-# Use bash to allow export.sh to detect its path (needs BASH_SOURCE) and force IDF_PATH usage
-SHELL ["/bin/bash","-c"]
-RUN <<'EOF'
-set -euo pipefail
-export IDF_PATH_FORCE=1
-source /opt/esp/idf/export.sh
-pip3 install --upgrade pyclang
-idf_tools.py install esp-clang
-
-# Ensure activation temp dir does not persist root ownership
-rm -rf /tmp/esp_idf_activate_vscode || true
-# Remove pip caches left by pyclang/idf_tools.py
-rm -rf /root/.cache/pip /home/$USERNAME/.cache/pip || true
-EOF
+# esp-clang and pyclang are not installed (2.2 GB): the firmware builds with IDF_TOOLCHAIN=gcc
+# and lints ESP sources with the system clangd against a sanitized compile database.
 
 # Default to non-root user for devcontainer runtime (use USERNAME at the top of the file)
 USER ${USERNAME}
